@@ -100,9 +100,15 @@ button,.mc,.pcard,.cc,.lbtn,.ci-btn,.qty-btn,.cpill,.ni,.adm-tab{font-family:inh
 @keyframes ovin{from{opacity:0}to{opacity:1}}
 .psheet{background:var(--noir2);border-radius:28px 28px 0 0;width:100%;max-height:92vh;overflow-y:auto;border-top:1px solid var(--border-2);}
 .psheet::before{content:'';display:block;width:36px;height:4px;background:var(--gris2);border-radius:4px;margin:12px auto 0;opacity:.5;}
-.psheet-media{width:100%;height:230px;background:var(--noir3);display:flex;align-items:center;justify-content:center;font-size:5rem;background-size:cover;background-position:center;position:relative;overflow:hidden;margin-top:10px;}
-.psheet-media video{width:100%;height:100%;object-fit:cover;}
+.psheet-media{width:100%;aspect-ratio:9/16;max-height:70vh;background:var(--noir3);display:flex;align-items:center;justify-content:center;font-size:5rem;position:relative;overflow:hidden;margin-top:10px;cursor:zoom-in;transition:aspect-ratio .25s ease;}
+.psheet-media img,.psheet-media video{width:100%;height:100%;object-fit:cover;display:block;}
 .psheet-media-ov{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 55%,var(--noir2));pointer-events:none;}
+.ps-expand{position:absolute;bottom:14px;right:14px;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.5);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;color:#fff;z-index:1;}
+.ps-expand svg{width:16px;height:16px;}
+#media-lightbox{background:rgba(0,0,0,.95);align-items:center;backdrop-filter:blur(4px);}
+#media-lightbox .close-btn{top:calc(env(safe-area-inset-top,0px) + 14px);}
+#lightbox-content{width:100%;max-height:88vh;display:flex;align-items:center;justify-content:center;}
+#lightbox-content img,#lightbox-content video{max-width:100%;max-height:88vh;width:auto;height:auto;object-fit:contain;border-radius:12px;}
 .close-btn{position:absolute;top:14px;right:14px;background:rgba(11,11,13,.6);backdrop-filter:blur(12px);border:1px solid var(--border-2);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;}
 .close-btn svg{width:16px;height:16px;}
 .psheet-body{padding:22px 20px 40px;}
@@ -634,11 +640,17 @@ input[type=color]{width:40px;height:40px;border:none;border-radius:10px;cursor:p
 </nav>
 
 <!-- PRODUCT SHEET -->
+<div class="ov" id="media-lightbox">
+  <button class="close-btn" onclick="closeOv('media-lightbox')"><svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"/></svg></button>
+  <div id="lightbox-content" onclick="closeOv('media-lightbox')"></div>
+</div>
+
 <div class="ov" id="prod-ov">
   <div class="psheet">
-    <div class="psheet-media" id="ps-media">
+    <div class="psheet-media" id="ps-media" onclick="openLightbox()">
       <div class="psheet-media-ov"></div>
-      <button class="close-btn" onclick="closeOv('prod-ov')"><svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"/></svg></button>
+      <button class="close-btn" onclick="event.stopPropagation();closeOv('prod-ov')"><svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"/></svg></button>
+      <button class="ps-expand" id="ps-expand" onclick="event.stopPropagation();openLightbox()" style="display:none"><svg viewBox="0 0 24 24"><path d="M8 4H4v4M16 4h4v4M4 16v4h4M20 16v4h-4"/></svg></button>
     </div>
     <div class="psheet-body">
       <div class="psheet-name" id="ps-name"></div>
@@ -930,19 +942,27 @@ function openSheet(idx){
   const p=D.products[idx];curPIdx=idx;selPrice=null;prodQty=1;
   document.getElementById('qty-n').textContent='1';
   const med=document.getElementById('ps-media');
-  // Clear previous media
-  const oldVid=med.querySelector('video');if(oldVid)oldVid.remove();
-  const oldSpan=med.querySelector('.ps-em');if(oldSpan)oldSpan.remove();
+  const expandBtn=document.getElementById('ps-expand');
+  // Clear previous media (keep the overlay gradient + buttons)
+  med.querySelectorAll('img,video,.ps-em').forEach(n=>n.remove());
+  med.style.aspectRatio='9/16';
   if(p.media&&p.mediaType==='video'){
-    med.style.backgroundImage='';med.style.fontSize='0';
-    const v=document.createElement('video');v.src=p.media;v.autoplay=true;v.muted=true;v.loop=true;v.playsInline=true;v.style='width:100%;height:100%;object-fit:cover;position:absolute;inset:0;';
+    med.style.fontSize='0';med.style.cursor='zoom-in';
+    const v=document.createElement('video');v.src=p.media;v.autoplay=true;v.muted=true;v.loop=true;v.playsInline=true;
+    v.onloadedmetadata=()=>{if(v.videoWidth&&v.videoHeight)med.style.aspectRatio=v.videoWidth+'/'+v.videoHeight;};
     med.insertBefore(v,med.firstChild);
+    expandBtn.style.display='flex';
   } else if(p.media){
-    med.style.backgroundImage=`url('${p.media}')`;med.style.backgroundSize='cover';med.style.backgroundPosition='center';med.style.fontSize='0';
+    med.style.fontSize='0';med.style.cursor='zoom-in';
+    const img=document.createElement('img');img.src=p.media;img.alt=p.name;
+    img.onload=()=>{med.style.aspectRatio=img.naturalWidth+'/'+img.naturalHeight;};
+    med.insertBefore(img,med.firstChild);
+    expandBtn.style.display='flex';
   } else {
-    med.style.backgroundImage='';med.style.fontSize='6rem';
+    med.style.fontSize='6rem';med.style.cursor='default';med.style.aspectRatio='9/16';
     const em=document.createElement('span');em.className='ps-em';em.textContent=p.emoji||'🟢';
     med.insertBefore(em,med.firstChild);
+    expandBtn.style.display='none';
   }
   document.getElementById('ps-name').textContent=p.name;
   document.getElementById('ps-desc').textContent=p.desc||'';
@@ -951,6 +971,19 @@ function openSheet(idx){
     :'<div class="empty-s" style="grid-column:span 2;padding:12px">Contacte-nous pour les tarifs</div>';
   document.getElementById('prod-ov').classList.add('open');
   try{if(tg?.HapticFeedback)tg.HapticFeedback.impactOccurred('light');}catch(e){}
+}
+function openLightbox(){
+  const p=D.products[curPIdx];if(!p||!p.media)return;
+  const c=document.getElementById('lightbox-content');
+  c.innerHTML='';
+  if(p.mediaType==='video'){
+    const v=document.createElement('video');v.src=p.media;v.autoplay=true;v.muted=false;v.loop=true;v.playsInline=true;v.controls=true;
+    c.appendChild(v);
+  }else{
+    const img=document.createElement('img');img.src=p.media;img.alt=p.name;
+    c.appendChild(img);
+  }
+  document.getElementById('media-lightbox').classList.add('open');
 }
 function selP(i,qty,price){
   selPrice={qty,price};
@@ -1254,7 +1287,7 @@ async function saveSettings(){
   applySettings();showOk();refreshAll();
 }
 
-function closeOv(id){document.getElementById(id).classList.remove('open');}
+function closeOv(id){const el=document.getElementById(id);el.classList.remove('open');el.querySelectorAll('video').forEach(v=>{try{v.pause();}catch(e){}});}
 function closeMod(id){document.getElementById(id).classList.remove('open');}
 </script>
 </body>
